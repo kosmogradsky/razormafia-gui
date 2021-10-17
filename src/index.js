@@ -1,16 +1,35 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const net = require("net");
-const rxjs = require("rxjs");
-const bcrypt = require("bcrypt");
-const nanoid = require("nanoid");
 
-const registeredUsers = [
+const ClientSession = require('./classes/ClientSession')
+
+global.registeredUsers = [
   {
     username: "kosmogradsky",
     hashedPassword: bcrypt.hashSync("12345678", 10),
   },
 ];
+
+function handleConnection(socket) {
+  function writeResponseBody(requestId, body) {
+    socket.write(JSON.stringify({ responseId: requestId, body }));
+  }
+
+  function writeSubscriptionMessage(subscriptionKey, message) {
+    socket.write(JSON.stringify({ subscription: subscriptionKey, message }));
+  }
+
+  const clientSession = new ClientSession({ writeSubscriptionMessage });
+
+  socket.setEncoding("utf8");
+  socket.on("data", async function (data) {
+    writeResponseBody(await clientSession.composeResponseBody(data));
+  });
+}
+
+const server = net.createServer(handleConnection);
+server.listen(8080, "127.0.0.1");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -24,76 +43,6 @@ function createWindow() {
   return win;
 }
 
-function createSessionMapSubject(socket, win) {
-  const sessionMapSubject = new rxjs.BehaviorSubject(new Map());
-
-  // socket.on
-
-  sessionMapSubject.subscribe((sessionMap) => {
-    win.webContents.send(sessionMap);
-  });
-}
-
 app.whenReady().then(() => {
-  const win = createWindow();
-
-  const server = net.createServer(function (socket) {
-    socket.setEncoding("utf8");
-
-    socket.on("data", (data) => {
-      const message = JSON.parse(data);
-      const requestId = message.requestId;
-      const body = message.body;
-
-      console.log(message);
-
-      if (requestId === undefined) {
-        console.log("requestId not found");
-        return;
-      }
-
-      switch (body.type) {
-        case "login": {
-          const { username, password } = body;
-
-          const registeredUser = registeredUsers.find(
-            (user) => user.username === username
-          );
-
-          if (registeredUser === undefined) {
-            socket.write(
-              JSON.stringify({
-                responseId: requestId,
-                body: { status: "error", reason: "wrong_credentials" },
-              })
-            );
-
-            break;
-          }
-
-          const isSamePassword = bcrypt.compareSync(
-            password,
-            registeredUser.hashedPassword
-          );
-
-          if (isSamePassword) {
-            socket.write(
-              JSON.stringify({ responseId: requestId, body: { status: "ok" } })
-            );
-          } else {
-            socket.write(
-              JSON.stringify({
-                responseId: requestId,
-                body: { status: "error", reason: "wrong_credentials" },
-              })
-            );
-          }
-
-          break;
-        }
-      }
-    });
-  });
-
-  server.listen(8080, "127.0.0.1");
+  createWindow();
 });
