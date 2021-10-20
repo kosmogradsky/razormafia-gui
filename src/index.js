@@ -2,6 +2,8 @@ const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const net = require("net");
 const bcrypt = require("bcrypt");
+const rxjs = require("rxjs");
+const immutable = require("immutable");
 
 const ClientSession = require("./classes/ClientSession");
 const writeStringToSocket = require("./util/writeStringToSocket");
@@ -13,6 +15,8 @@ global.registeredUsers = [
     hashedPassword: bcrypt.hashSync("12345678", 10),
   },
 ];
+
+const gameQueueSubject = new rxjs.BehaviorSubject(new immutable.Set());
 
 function handleConnection(socket) {
   function writeResponseBody(requestId, body) {
@@ -29,7 +33,10 @@ function handleConnection(socket) {
     );
   }
 
-  const clientSession = new ClientSession({ writeSubscriptionMessage });
+  const clientSession = new ClientSession({
+    writeSubscriptionMessage,
+    externalSubjectsMap: new Map([["game_queue", gameQueueSubject]]),
+  });
 
   socket.on("data", async function (dataBuffer) {
     const dataUint8Array = new Uint8Array(dataBuffer);

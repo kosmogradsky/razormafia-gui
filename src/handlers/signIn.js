@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 
-module.exports = async function ({ requestBody, authStateSubject }) {
+module.exports = async function ({ requestBody, subjectsMap }) {
   const { username, password } = requestBody;
 
   const registeredUser = global.registeredUsers.find(
@@ -17,7 +17,7 @@ module.exports = async function ({ requestBody, authStateSubject }) {
   );
 
   if (isSamePassword) {
-    authStateSubject.next({ type: "authenticated", username });
+    subjectsMap.get("auth_state").next({ type: "authenticated", username });
     return { status: "ok" };
   } else {
     return { status: "error", reason: "wrong_credentials" };
