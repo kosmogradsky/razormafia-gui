@@ -1,5 +1,7 @@
 class SubscriptionManager {
   #subscriptionsMap = new Map();
+  #observablesMap;
+  #writeSubscriptionMessage;
 
   constructor({ observablesMap, writeSubscriptionMessage }) {
     this.#observablesMap = observablesMap;
@@ -10,8 +12,6 @@ class SubscriptionManager {
     const existingSubscription = this.#subscriptionsMap.get(observableKey);
 
     if (existingSubscription === undefined) {
-      return { status: "error", reason: "already_subscribed" };
-    } else {
       const observable = this.#observablesMap.get(observableKey);
 
       if (observable === undefined) {
@@ -24,6 +24,8 @@ class SubscriptionManager {
 
         return { status: "ok" };
       }
+    } else {
+      return { status: "error", reason: "already_subscribed" };
     }
   }
 

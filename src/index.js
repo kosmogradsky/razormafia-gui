@@ -1,8 +1,11 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const net = require("net");
+const bcrypt = require("bcrypt");
 
-const ClientSession = require('./classes/ClientSession')
+const ClientSession = require("./classes/ClientSession");
+const writeStringToSocket = require("./util/writeStringToSocket");
+const readMessagesFromSocket = require("./util/readMessagesFromSocket");
 
 global.registeredUsers = [
   {
@@ -13,18 +16,42 @@ global.registeredUsers = [
 
 function handleConnection(socket) {
   function writeResponseBody(requestId, body) {
-    socket.write(JSON.stringify({ responseId: requestId, body }));
+    writeStringToSocket(
+      socket,
+      JSON.stringify({ responseId: requestId, body })
+    );
   }
 
   function writeSubscriptionMessage(subscriptionKey, message) {
-    socket.write(JSON.stringify({ subscription: subscriptionKey, message }));
+    writeStringToSocket(
+      socket,
+      JSON.stringify({ subscription: subscriptionKey, message })
+    );
   }
 
   const clientSession = new ClientSession({ writeSubscriptionMessage });
 
-  socket.setEncoding("utf8");
-  socket.on("data", async function (data) {
-    writeResponseBody(await clientSession.composeResponseBody(data));
+  socket.on("data", async function (dataBuffer) {
+    const dataUint8Array = new Uint8Array(dataBuffer);
+    const strMessages = readMessagesFromSocket(dataUint8Array);
+    console.log(strMessages);
+
+    for (const strMessage of strMessages) {
+      console.log(strMessage);
+      const parsedRequestData = JSON.parse(strMessage);
+      const requestId = parsedRequestData.requestId;
+
+      if (requestId === undefined) {
+        console.log("requestId not found");
+        continue;
+      }
+
+      clientSession
+        .composeResponseBody(parsedRequestData)
+        .then((responseBody) => {
+          writeResponseBody(requestId, responseBody);
+        });
+    }
   });
 }
 

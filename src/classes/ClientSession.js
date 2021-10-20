@@ -1,31 +1,25 @@
-const rxjs = require('rxjs');
+const rxjs = require("rxjs");
 
 const SubscriptionManager = require("./SubscriptionManager");
 const signInHandler = require("../handlers/signIn");
 
 class ClientSession {
-  #authStateSubject = rxjs.BehaviorSubject({ type: "unauthenticated" });
+  #authStateSubject = new rxjs.BehaviorSubject({ type: "unauthenticated" });
+  #subscriptionManager;
 
   constructor({ writeSubscriptionMessage }) {
     this.#subscriptionManager = new SubscriptionManager({
-      observablesMap: new Map(["auth_state", this.#authStateSubject]),
+      observablesMap: new Map([["auth_state", this.#authStateSubject]]),
       writeSubscriptionMessage,
     });
   }
 
-  composeResponseBody(requestData) {
-    const parsedRequestData = JSON.parse(requestData);
-    const requestId = parsedRequestData.requestId;
-    const requestPath = parsedRequestData.path;
-    const requestBody = parsedRequestData.body;
-    const requestMethod = parsedRequestData.method;
+  async composeResponseBody(requestData) {
+    const requestPath = requestData.path;
+    const requestBody = requestData.body;
+    const requestMethod = requestData.method;
 
-    console.log(parsedRequestData);
-
-    if (requestId === undefined) {
-      console.log("requestId not found");
-      return;
-    }
+    console.log(requestData);
 
     if (requestMethod === "subscribe") {
       return this.#subscriptionManager.subscribe(requestPath);
